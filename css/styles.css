@@ -850,6 +850,7 @@ body {
     .navbar-content {
         display: flex !important;
         flex-direction: column !important;
+        padding: 28px 16px 24px !important;
     }
 
     .nav-top {
