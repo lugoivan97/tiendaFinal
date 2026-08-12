@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Beat & Home | Tienda Oficial</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <!-- Estilos CSS -->
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+    <!-- Barra de Anuncio -->
+    <div class="announcement-bar">
+        ⚡ ENVIOS A TODO EL PAÍS • 3 Y 6 CUOTAS SIN INTERÉS EN PRODUCTOS SELECCIONADOS ⚡
+    </div>
+
+    <!-- Header / Navegación Principal -->
+    <header class="main-header">
+        <div class="container navbar-content">
+            <a href="#" class="logo" id="main-logo">
+                <span class="logo-beat">BEAT</span>
+                <span class="logo-divider">•</span>
+                <span class="logo-home">HOME</span>
+            </a>
+
+            <div class="search-bar">
+                <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                <input type="text" id="search-input" placeholder="Buscar por producto, marca o categoría...">
+            </div>
+
+            <div class="nav-actions">
+                <button class="cart-btn" id="cart-toggle-btn">
+                    <i class="fa-solid fa-cart-shopping"></i>
+                    <span>Mi Carrito</span>
+                    <span class="cart-count" id="cart-count">0</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Sección Hero -->
+    <section class="hero-section">
+        <div class="container hero-container">
+            <div class="hero-content">
+                <span class="hero-badge">NUEVA COLECCIÓN 2026</span>
+                <h1>El ritmo de tu vida y el confort de tu hogar</h1>
+                <p>Descubrí nuestra línea exclusiva de audio de alta fidelidad Beat y organizadores minimalistas Home.</p>
+                <div class="hero-btns">
+                    <button class="btn btn-beat" onclick="filterCategory('audio')">
+                        <i class="fa-solid fa-headphones"></i> Línea Beat
+                    </button>
+                    <button class="btn btn-home" onclick="filterCategory('bazar')">
+                        <i class="fa-solid fa-house"></i> Línea Home
+                    </button>
+                </div>
+            </div>
+            <div class="hero-image">
+                <img src="https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=600&q=80" alt="Beat & Home Hero">
+            </div>
+        </div>
+    </section>
+
+    <!-- Sección Catálogo -->
+    <main class="container catalog-section">
+        <!-- Pestañas de Categoría -->
+        <div class="category-tabs">
+            <button class="tab-btn active" data-category="todos">Todos los productos</button>
+            <button class="tab-btn tab-beat" data-category="audio"><i class="fa-solid fa-headphones"></i> Beat Audio</button>
+            <button class="tab-btn tab-home" data-category="bazar"><i class="fa-solid fa-house"></i> Home Bazar</button>
+            <button class="tab-btn" data-category="ofertas"><i class="fa-solid fa-tag"></i> Ofertas y Destacados</button>
+        </div>
+
+        <!-- Barra de Herramientas (Conteo y Orden) -->
+        <div class="catalog-toolbar">
+            <span id="results-count">Mostrando 0 productos</span>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <label for="sort-select" style="font-size: 0.9rem; font-weight: 600;">Ordenar por:</label>
+                <select id="sort-select" class="btn btn-outline" style="padding: 8px 15px; border-radius: 8px;">
+                    <option value="default">Recomendados</option>
+                    <option value="price-low">Precio: Menor a Mayor</option>
+                    <option value="price-high">Precio: Mayor a Menor</option>
+                    <option value="name">Nombre (A-Z)</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Grilla de Productos -->
+        <div class="products-grid" id="products-grid">
+            <!-- Renderizado dinámico desde script.js -->
+        </div>
+    </main>
+
+    <!-- Drawer del Carrito -->
+    <div class="cart-overlay" id="cart-overlay"></div>
+    <aside class="cart-drawer" id="cart-drawer">
+        <div class="cart-header">
+            <h3><i class="fa-solid fa-basket-shopping"></i> Tu Carrito</h3>
+            <button class="close-btn" id="close-cart-btn"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="cart-body" id="cart-items-container">
+            <!-- Items del carrito renderizados desde script.js -->
+        </div>
+        <div class="cart-footer">
+            <div class="cart-total-row">
+                <span>Total:</span>
+                <span id="cart-total-price">$0</span>
+            </div>
+            <button class="checkout-btn" id="whatsapp-checkout-btn">
+                <i class="fa-brands fa-whatsapp"></i> Finalizar Pedido por WhatsApp
+            </button>
+            <small class="whatsapp-note">Serás redirigido a WhatsApp con el detalle de tu compra.</small>
+        </div>
+    </aside>
+
+    <!-- Modal Login Administrador -->
+    <div class="modal-overlay" id="admin-login-modal">
+        <div class="modal-card">
+            <div style="text-align: right;">
+                <button class="close-btn" onclick="closeAdminLogin()"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-header">
+                <div class="admin-icon"><i class="fa-solid fa-lock"></i></div>
+                <h2>Acceso Administrador</h2>
+                <p style="font-size: 0.85rem; color: #64748b;">Ingresá la contraseña de gestión</p>
+            </div>
+            <form id="admin-login-form">
+                <div class="form-group">
+                    <label for="admin-pass-input">Contraseña</label>
+                    <input type="password" id="admin-pass-input" placeholder="Ej: 1234" required>
+                </div>
+                <button type="submit" class="btn btn-beat btn-block">Ingresar al Panel</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Panel Administrador -->
+    <div class="modal-overlay" id="admin-panel-modal">
+        <div class="admin-panel-container">
+            <div class="admin-header">
+                <h2><i class="fa-solid fa-sliders"></i> Panel de Control - Beat & Home</h2>
+                <button class="btn btn-outline" onclick="closeAdminPanel()"><i class="fa-solid fa-xmark"></i> Cerrar</button>
+            </div>
+
+            <div class="admin-grid">
+                <!-- Columna Izquierda: Formulario Manual y Carga Masiva CSV -->
+                <div class="admin-card">
+                    <!-- Sección de Carga Masiva CSV -->
+                    <div class="bulk-upload-box">
+                        <div class="bulk-header">
+                            <i class="fa-solid fa-file-csv"></i>
+                            <div>
+                                <strong>Carga Masiva de Productos (CSV)</strong>
+                                <p>Importá tu catálogo desde Excel o CSV</p>
+                            </div>
+                        </div>
+                        <div class="form-group" style="margin-top: 10px;">
+                            <input type="file" id="csv-file-input" accept=".csv" style="font-size: 0.8rem;">
+                        </div>
+                        <div class="bulk-mode-options">
+                            <label><input type="radio" name="csv-mode" value="append" checked> Sumar al catálogo</label>
+                            <label><input type="radio" name="csv-mode" value="replace"> Reemplazar todo</label>
+                        </div>
+                        <div class="bulk-actions">
+                            <button class="btn btn-beat btn-sm" onclick="processCSVImport()">
+                                <i class="fa-solid fa-file-import"></i> Importar CSV
+                            </button>
+                            <button class="btn btn-outline btn-sm" onclick="downloadCSVTemplate()">
+                                <i class="fa-solid fa-download"></i> Plantilla CSV
+                            </button>
+                        </div>
+                    </div>
+
+                    <hr style="margin: 20px 0; border: none; border-top: 1px solid #e2e8f0;">
+
+                    <!-- Formulario Manual de Alta / Edición -->
+                    <h3 id="form-title">Agregar / Editar Producto</h3>
+                    <form id="product-form">
+                        <input type="hidden" id="prod-id">
+
+                        <div class="form-group">
+                            <label for="prod-title">Título del Producto</label>
+                            <input type="text" id="prod-title" required placeholder="Ej. Parlante Bluetooth">
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="prod-price">Precio ($)</label>
+                                <input type="number" id="prod-price" required placeholder="25000">
+                            </div>
+                            <div class="form-group">
+                                <label for="prod-category">Categoría</label>
+                                <select id="prod-category" required>
+                                    <option value="audio">Beat (Audio)</option>
+                                    <option value="bazar">Home (Bazar)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="prod-image">URL Imagen</label>
+                            <input type="url" id="prod-image" required placeholder="https://images.unsplash.com/...">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="prod-badge">Etiqueta / Badge (Opcional)</label>
+                            <input type="text" id="prod-badge" placeholder="Ej: Más Vendido, 15% OFF">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="prod-desc">Descripción</label>
+                            <textarea id="prod-desc" rows="3" placeholder="Detalles técnicos o características principales..."></textarea>
+                        </div>
+
+                        <div style="display: flex; gap: 10px;">
+                            <button type="submit" class="btn btn-beat btn-block" id="save-prod-btn">
+                                <i class="fa-solid fa-floppy-disk"></i> Guardar Producto
+                            </button>
+                            <button type="button" class="btn btn-outline" id="cancel-edit-btn" onclick="resetProductForm()" style="display: none;">
+                                Cancelar
+                            </button>
+                        </div>
+                    </form>
+
+                    <hr style="margin: 20px 0; border: none; border-top: 1px solid #e2e8f0;">
+
+                    <!-- Ajuste Masivo de Precios -->
+                    <div class="mass-price-box">
+                        <strong><i class="fa-solid fa-percent"></i> Actualización Masiva de Precios</strong>
+                        <p style="color: #64748b; margin-top: 4px;">Aumentá o descontá un porcentaje a todo el catálogo.</p>
+                        <div class="mass-price-inputs">
+                            <input type="number" id="mass-percentage" placeholder="%" min="1" max="500">
+                            <button class="btn btn-beat" style="padding: 6px 12px; font-size: 0.8rem;" onclick="applyMassPriceChange(1)">+ Aumentar</button>
+                            <button class="btn btn-home" style="padding: 6px 12px; font-size: 0.8rem;" onclick="applyMassPriceChange(-1)">- Descontar</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Columna Derecha: Tabla de Productos -->
+                <div class="admin-card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h3>Catálogo Actual</h3>
+                        <button class="btn btn-outline btn-sm" onclick="deleteAllProducts()" style="color: #dc2626; border-color: #fca5a5;">
+                            <i class="fa-solid fa-trash-can"></i> Vaciar Todo
+                        </button>
+                    </div>
+                    <div class="admin-table-wrapper">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>Img</th>
+                                    <th>Producto</th>
+                                    <th>Cat.</th>
+                                    <th>Precio</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="admin-products-table">
+                                <!-- Filas renderizadas desde script.js -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pie de Página -->
+    <footer class="main-footer">
+        <div class="container footer-content">
+            <div class="footer-brand">
+                <a href="#" class="logo" style="margin-bottom: 10px;">
+                    <span class="logo-beat">BEAT</span>
+                    <span class="logo-divider">•</span>
+                    <span class="logo-home">HOME</span>
+                </a>
+                <p>Soluciones integrales de audio personal y artículos de bazar moderno para el hogar.</p>
+            </div>
+            <div class="footer-links">
+                <h4>Navegación</h4>
+                <ul>
+                    <li><a href="#" onclick="filterCategory('todos')">Catálogo Completo</a></li>
+                    <li><a href="#" onclick="filterCategory('audio')">Audio Beat</a></li>
+                    <li><a href="#" onclick="filterCategory('bazar')">Bazar Home</a></li>
+                    <li><a href="#" onclick="filterCategory('ofertas')">Ofertas</a></li>
+                </ul>
+            </div>
+            <div class="footer-contact">
+                <h4>Contacto</h4>
+                <p><i class="fa-brands fa-whatsapp"></i> +54 9 11 1234-5678</p>
+                <p><i class="fa-solid fa-envelope"></i> contacto@beatandhome.com</p>
+                <p><i class="fa-solid fa-location-dot"></i> Buenos Aires, Argentina</p>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Beat & Home. Todos los derechos reservados.</p>
+        </div>
+    </footer>
+
+    <!-- Lógica de Funcionamiento JS -->
+    <script src="js/script.js"></script>
+</body>
+</html>
