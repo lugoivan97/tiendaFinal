@@ -2,8 +2,12 @@
    BEAT & HOME - LÓGICA DE FUNCIONAMIENTO, CARRITO E INTERFAZ
    ========================================================================== */
 
-// --- 1. PRODUCTOS POR DEFECTO Y ESTADO GLOBAL ---
-const DEFAULT_PRODUCTS = [
+// --- 0. FUENTE DE PRODUCTOS: GOOGLE SHEET PUBLICADO COMO CSV ---
+// Pegá acá el link que te da Google al "Publicar en la Web" (termina en output=csv)
+const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQW1YgRMWRiXCtQw8GvUeMDpI2-HPpDRQ6_yoBKWYbNOU0QMm0pSusf-thsDt_pjyGRy1E454sEvhxc/pub?output=csv";
+
+// Catálogo de respaldo por si el Sheet no carga (sin internet, link mal puesto, etc.)
+const FALLBACK_PRODUCTS = [
     {
         id: 1,
         title: "Auriculares Wireless Beat Pro X",
@@ -21,47 +25,11 @@ const DEFAULT_PRODUCTS = [
         image: "https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=600&q=80",
         badge: "Línea Home",
         desc: "Acero inoxidable doble capa. Mantiene el calor durante 24 horas."
-    },
-    {
-        id: 3,
-        title: "Auriculares In-Ear Bluetooth Sport",
-        category: "audio",
-        price: 18200,
-        image: "https://images.unsplash.com/photo-1590658268037-6bf12165a8df?auto=format&fit=crop&w=600&q=80",
-        badge: "15% OFF",
-        desc: "Resistentes al agua IPX7, ideales para entrenamiento y running."
-    },
-    {
-        id: 4,
-        title: "Set x3 Organizadores de Cocina Minimal",
-        category: "bazar",
-        price: 14500,
-        image: "https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&w=600&q=80",
-        badge: "Novedad",
-        desc: "Frascos herméticos de vidrio con tapa de bambú natural."
-    },
-    {
-        id: 5,
-        title: "Parlante Portátil Waterproof Beat Bass",
-        category: "audio",
-        price: 41000,
-        image: "https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?auto=format&fit=crop&w=600&q=80",
-        badge: "Destacado",
-        desc: "Potencia 20W, luces RGB sincronizadas y conexión Bluetooth 5.3."
-    },
-    {
-        id: 6,
-        title: "Prensa Francesa Cafetera 800ml",
-        category: "bazar",
-        price: 19800,
-        image: "https://images.unsplash.com/photo-1572119865084-43c285814d63?auto=format&fit=crop&w=600&q=80",
-        badge: "Favorito",
-        desc: "Cristal borosilicato resistente al fuego directo y filtro de acero."
     }
 ];
 
 // Estado global de la aplicación
-let products = JSON.parse(localStorage.getItem('bh_products')) || DEFAULT_PRODUCTS;
+let products = [];
 let cart = JSON.parse(localStorage.getItem('bh_cart')) || [];
 let currentCategory = 'todos';
 let searchQuery = '';
@@ -70,13 +38,14 @@ let currentSort = 'default';
 // Referencias a elementos DOM
 let DOM = {};
 
-// --- 2. INICIALIZACIÓN ---
-document.addEventListener('DOMContentLoaded', () => {
+// --- 1. INICIALIZACIÓN ---
+document.addEventListener('DOMContentLoaded', async () => {
     cacheDOMElements();
-    saveProductsToStorage();
+    setupEventListeners();
+    showCatalogLoading();
+    await loadProductsFromSheet();
     renderProducts();
     updateCartUI();
-    setupEventListeners();
 });
 
 function cacheDOMElements() {
@@ -102,13 +71,113 @@ function cacheDOMElements() {
     };
 }
 
-// Persistencia en LocalStorage
-function saveProductsToStorage() {
-    localStorage.setItem('bh_products', JSON.stringify(products));
-}
-
 function saveCartToStorage() {
     localStorage.setItem('bh_cart', JSON.stringify(cart));
+}
+
+// --- 2. CARGA DEL CATÁLOGO DESDE GOOGLE SHEETS ---
+function showCatalogLoading() {
+    if (DOM.productsGrid) {
+        DOM.productsGrid.innerHTML = `
+            <div style="grid-column: 1/-1; text-align: center; padding: 40px; color: #64748b;">
+                <i class="fa-solid fa-spinner fa-spin" style="font-size: 1.8rem; margin-bottom: 10px;"></i>
+                <p>Cargando catálogo...</p>
+            </div>
+        `;
+    }
+}
+
+async function loadProductsFromSheet() {
+    if (!SHEET_CSV_URL || SHEET_CSV_URL.includes("PEGA_ACA")) {
+        console.warn("SHEET_CSV_URL no está configurado. Usando catálogo de respaldo.");
+        products = FALLBACK_PRODUCTS;
+        return;
+    }
+
+    try {
+        const response = await fetch(SHEET_CSV_URL, { cache: "no-store" });
+        if (!response.ok) throw new Error("Respuesta no válida del Sheet");
+
+        const csvText = await response.text();
+        const parsed = parseCSVToProducts(csvText);
+
+        products = parsed.length > 0 ? parsed : FALLBACK_PRODUCTS;
+    } catch (err) {
+        console.error("No se pudo cargar el catálogo desde Google Sheets:", err);
+        products = FALLBACK_PRODUCTS;
+    }
+}
+
+// Separa una línea de CSV respetando comas dentro de comillas
+function splitCSVLine(line) {
+    const result = [];
+    let current = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        if (char === '"') {
+            if (inQuotes && line[i + 1] === '"') {
+                current += '"';
+                i++;
+            } else {
+                inQuotes = !inQuotes;
+            }
+        } else if (char === ',' && !inQuotes) {
+            result.push(current);
+            current = '';
+        } else {
+            current += char;
+        }
+    }
+    result.push(current);
+    return result.map(v => v.trim());
+}
+
+function parseCSVToProducts(csvText) {
+    const rows = csvText.split('\n').map(r => r.trim()).filter(r => r.length > 0);
+    if (rows.length <= 1) return [];
+
+    const headers = splitCSVLine(rows[0]).map(h => h.toLowerCase());
+    const idx = {
+        titulo: headers.indexOf('titulo'),
+        categoria: headers.indexOf('categoria'),
+        precio: headers.indexOf('precio'),
+        imagen: headers.indexOf('imagen'),
+        badge: headers.indexOf('badge'),
+        descripcion: headers.indexOf('descripcion')
+    };
+
+    if (idx.titulo === -1 || idx.precio === -1) {
+        console.error('El CSV del Sheet no tiene las columnas "titulo" y/o "precio".');
+        return [];
+    }
+
+    const defaultImg = 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=600&q=80';
+    const parsed = [];
+
+    for (let i = 1; i < rows.length; i++) {
+        const cols = splitCSVLine(rows[i]);
+        const title = cols[idx.titulo];
+        const priceRaw = idx.precio !== -1 ? cols[idx.precio] : '';
+        const price = parseFloat(String(priceRaw).replace(/[^\d.-]/g, ''));
+
+        if (!title || !price) continue;
+
+        const rawCategory = (idx.categoria !== -1 ? cols[idx.categoria] : '').toLowerCase();
+
+        parsed.push({
+            id: i,
+            title,
+            category: (rawCategory === 'audio' || rawCategory === 'beat') ? 'audio' : 'bazar',
+            price,
+            image: (idx.imagen !== -1 && cols[idx.imagen]) ? cols[idx.imagen] : defaultImg,
+            badge: idx.badge !== -1 ? cols[idx.badge] : '',
+            desc: idx.descripcion !== -1 ? cols[idx.descripcion] : ''
+        });
+    }
+
+    return parsed;
 }
 
 // --- 3. RENDERIZADO Y FILTRADO DEL CATÁLOGO ---
@@ -120,7 +189,7 @@ function renderProducts() {
         const matchesCategory = currentCategory === 'todos' || 
                                 (currentCategory === 'ofertas' ? Boolean(p.badge) : p.category === currentCategory);
         const matchesSearch = p.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                              p.desc.toLowerCase().includes(searchQuery.toLowerCase());
+                              (p.desc || '').toLowerCase().includes(searchQuery.toLowerCase());
         return matchesCategory && matchesSearch;
     });
 
@@ -285,7 +354,13 @@ function sendWhatsAppOrder() {
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
 }
 
-// --- 5. PANEL ADMINISTRADOR ---
+// --- 5. PANEL ADMINISTRADOR (solo vista previa local, ver nota abajo) ---
+// IMPORTANTE: como el catálogo ahora se carga desde Google Sheets, estas
+// funciones del panel admin ya NO son la fuente real de la tienda. Cualquier
+// cambio hecho acá solo se ve en tu propio navegador, hasta que recargues
+// la página (en ese momento se vuelve a pisar con lo que diga el Sheet).
+// Se dejan activas por si te sirven para previsualizar algo puntual.
+
 function openAdminLogin() { 
     if (DOM.adminPassInput) DOM.adminPassInput.value = '';
     if (DOM.adminLoginModal) DOM.adminLoginModal.classList.add('active'); 
@@ -343,11 +418,10 @@ function handleProductFormSubmit(e) {
         products.push({ id: Date.now(), title, price, category, image, badge, desc });
     }
 
-    saveProductsToStorage();
     renderProducts();
     renderAdminTable();
     resetProductForm();
-    alert('Producto guardado con éxito.');
+    alert('Guardado solo en tu navegador (vista previa). Para que se vea en la tienda real, cargalo en el Google Sheet.');
 }
 
 function editProduct(id) {
@@ -387,11 +461,10 @@ function resetProductForm() {
 }
 
 function deleteProduct(id) {
-    if (confirm('¿Eliminar este producto del catálogo?')) {
+    if (confirm('¿Eliminar este producto de la vista previa local?')) {
         products = products.filter(p => p.id !== id);
         cart = cart.filter(p => p.id !== id);
         saveCartToStorage();
-        saveProductsToStorage();
         renderProducts();
         renderAdminTable();
         updateCartUI();
@@ -399,11 +472,10 @@ function deleteProduct(id) {
 }
 
 function deleteAllProducts() {
-    if (confirm('⚠️ ¿Estás seguro de que querés borrar TODO el catálogo de productos? Esta acción no se puede deshacer.')) {
+    if (confirm('⚠️ Esto borra la vista previa local, no el Google Sheet. ¿Continuar?')) {
         products = [];
         cart = [];
         saveCartToStorage();
-        saveProductsToStorage();
         renderProducts();
         renderAdminTable();
         updateCartUI();
@@ -425,100 +497,9 @@ function applyMassPriceChange(multiplier) {
         price: Math.round(p.price * factor)
     }));
 
-    saveProductsToStorage();
     renderProducts();
     renderAdminTable();
-    alert(`Precios actualizados un ${percentage}% correctamente.`);
-}
-
-// --- 6. IMPORTACIÓN Y EXPORTACIÓN CSV ---
-function processCSVImport() {
-    const fileInput = document.getElementById('csv-file-input');
-    const file = fileInput ? fileInput.files[0] : null;
-
-    if (!file) {
-        alert('Por favor seleccioná un archivo .csv primero.');
-        return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = function (e) {
-        const text = e.target.result;
-        const rows = text.split('\n').map(row => row.trim()).filter(row => row.length > 0);
-
-        if (rows.length <= 1) {
-            alert('El archivo CSV está vacío o no tiene el formato correcto.');
-            return;
-        }
-
-        const modeEl = document.querySelector('input[name="csv-mode"]:checked');
-        const mode = modeEl ? modeEl.value : 'append';
-        const newProducts = [];
-        const defaultImg = 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=600&q=80';
-
-        for (let i = 1; i < rows.length; i++) {
-            const columns = rows[i].split(/,|;/).map(col => col.replace(/^"(.*)"$/, '$1').trim());
-
-            if (columns.length >= 3) {
-                const title = columns[0];
-                const category = (columns[1] || 'bazar').toLowerCase();
-                const price = parseFloat(columns[2]) || 0;
-                const image = columns[3] || defaultImg;
-                const badge = columns[4] || '';
-                const desc = columns[5] || '';
-
-                if (title && price > 0) {
-                    newProducts.push({
-                        id: Date.now() + i,
-                        title,
-                        category: (category === 'audio' || category === 'beat') ? 'audio' : 'bazar',
-                        price,
-                        image,
-                        badge,
-                        desc
-                    });
-                }
-            }
-        }
-
-        if (newProducts.length === 0) {
-            alert('No se pudieron procesar productos válidos. Verificá la plantilla.');
-            return;
-        }
-
-        if (mode === 'replace') {
-            products = newProducts;
-            cart = [];
-            saveCartToStorage();
-            updateCartUI();
-        } else {
-            products = [...products, ...newProducts];
-        }
-
-        saveProductsToStorage();
-        renderProducts();
-        renderAdminTable();
-        fileInput.value = '';
-
-        alert(`¡Carga exitosa! Se importaron ${newProducts.length} productos correctamente.`);
-    };
-
-    reader.readAsText(file);
-}
-
-function downloadCSVTemplate() {
-    const csvContent = "data:text/csv;charset=utf-8," 
-        + "titulo,categoria,precio,imagen,badge,descripcion\n"
-        + "Parlante RGB Mini,audio,18500,https://images.unsplash.com/photo-1608043152269-423dbba4e7e1,Oferta,Parlante bluetooth con luces led\n"
-        + "Molinillo de Café Manual,bazar,12400,https://images.unsplash.com/photo-1572119865084-43c285814d63,Home,Molinillo cerámico regulable";
-
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "plantilla_beat_and_home.csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    alert(`Vista previa actualizada un ${percentage}%. Recordá que esto no cambia el Google Sheet.`);
 }
 
 // Helper para sanear HTML y evitar inyecciones de código
@@ -532,7 +513,7 @@ function escapeHTML(str) {
         .replace(/'/g, '&#039;');
 }
 
-// --- 7. CONFIGURACIÓN DE LISTENERS ---
+// --- 6. CONFIGURACIÓN DE LISTENERS ---
 function setupEventListeners() {
     if (DOM.searchInput) {
         DOM.searchInput.addEventListener('input', (e) => {
@@ -589,11 +570,11 @@ function setupEventListeners() {
         DOM.adminLoginForm.addEventListener('submit', (e) => {
             e.preventDefault();
             const pass = DOM.adminPassInput ? DOM.adminPassInput.value : '';
-            if (pass === '1234' || pass === 'admin') {
+            if (pass === '@IvanOliviaKimi' || pass === 'adminadmin') {
                 closeAdminLogin();
                 openAdminPanel();
             } else {
-                alert('Contraseña incorrecta. Probá con "1234".');
+                alert('Contraseña incorrecta. Probá con "admin".');
             }
         });
     }
