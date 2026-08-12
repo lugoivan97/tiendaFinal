@@ -2,7 +2,8 @@
    BEAT & HOME - LÓGICA DE FUNCIONAMIENTO, CARRITO E INTERFAZ
    ========================================================================== */
 
-const defaultProducts = [
+// --- 1. PRODUCTOS POR DEFECTO Y ESTADO GLOBAL ---
+const DEFAULT_PRODUCTS = [
     {
         id: 1,
         title: "Auriculares Wireless Beat Pro X",
@@ -10,7 +11,7 @@ const defaultProducts = [
         price: 32500,
         image: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=600&q=80",
         badge: "Más Vendido",
-        desc: "Cancelación activa de ruido, microfono HD y 30hs de batería continua."
+        desc: "Cancelación activa de ruido, micrófono HD y 30hs de batería continua."
     },
     {
         id: 2,
@@ -60,29 +61,48 @@ const defaultProducts = [
 ];
 
 // Estado global de la aplicación
-let products = JSON.parse(localStorage.getItem('bh_products')) || defaultProducts;
+let products = JSON.parse(localStorage.getItem('bh_products')) || DEFAULT_PRODUCTS;
 let cart = JSON.parse(localStorage.getItem('bh_cart')) || [];
 let currentCategory = 'todos';
 let searchQuery = '';
 let currentSort = 'default';
 
-// Elementos DOM
-const productsGrid = document.getElementById('products-grid');
-const cartDrawer = document.getElementById('cart-drawer');
-const cartOverlay = document.getElementById('cart-overlay');
-const cartItemsContainer = document.getElementById('cart-items-container');
-const cartCountEl = document.getElementById('cart-count');
-const cartTotalPriceEl = document.getElementById('cart-total-price');
-const resultsCountEl = document.getElementById('results-count');
+// Referencias a elementos DOM
+let DOM = {};
 
-// Inicialización
+// --- 2. INICIALIZACIÓN ---
 document.addEventListener('DOMContentLoaded', () => {
+    cacheDOMElements();
     saveProductsToStorage();
     renderProducts();
     updateCartUI();
     setupEventListeners();
 });
 
+function cacheDOMElements() {
+    DOM = {
+        productsGrid: document.getElementById('products-grid'),
+        cartDrawer: document.getElementById('cart-drawer'),
+        cartOverlay: document.getElementById('cart-overlay'),
+        cartItemsContainer: document.getElementById('cart-items-container'),
+        cartCountEl: document.getElementById('cart-count'),
+        cartTotalPriceEl: document.getElementById('cart-total-price'),
+        resultsCountEl: document.getElementById('results-count'),
+        searchInput: document.getElementById('search-input'),
+        sortSelect: document.getElementById('sort-select'),
+        cartToggleBtn: document.getElementById('cart-toggle-btn'),
+        closeCartBtn: document.getElementById('close-cart-btn'),
+        mainLogo: document.getElementById('main-logo'),
+        adminLoginForm: document.getElementById('admin-login-form'),
+        adminPassInput: document.getElementById('admin-pass-input'),
+        adminLoginModal: document.getElementById('admin-login-modal'),
+        adminPanelModal: document.getElementById('admin-panel-modal'),
+        productForm: document.getElementById('product-form'),
+        whatsappCheckoutBtn: document.getElementById('whatsapp-checkout-btn')
+    };
+}
+
+// Persistencia en LocalStorage
 function saveProductsToStorage() {
     localStorage.setItem('bh_products', JSON.stringify(products));
 }
@@ -91,24 +111,31 @@ function saveCartToStorage() {
     localStorage.setItem('bh_cart', JSON.stringify(cart));
 }
 
-// Renderizado del Catálogo
+// --- 3. RENDERIZADO Y FILTRADO DEL CATÁLOGO ---
 function renderProducts() {
-    let filtered = products.filter(p => {
+    if (!DOM.productsGrid) return;
+
+    // Filtrado
+    const filtered = products.filter(p => {
         const matchesCategory = currentCategory === 'todos' || 
-                                (currentCategory === 'ofertas' ? p.badge : p.category === currentCategory);
+                                (currentCategory === 'ofertas' ? Boolean(p.badge) : p.category === currentCategory);
         const matchesSearch = p.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
                               p.desc.toLowerCase().includes(searchQuery.toLowerCase());
         return matchesCategory && matchesSearch;
     });
 
+    // Ordenamiento
     if (currentSort === 'price-low') filtered.sort((a, b) => a.price - b.price);
     if (currentSort === 'price-high') filtered.sort((a, b) => b.price - a.price);
     if (currentSort === 'name') filtered.sort((a, b) => a.title.localeCompare(b.title));
 
-    resultsCountEl.innerText = `Mostrando ${filtered.length} productos`;
+    if (DOM.resultsCountEl) {
+        DOM.resultsCountEl.innerText = `Mostrando ${filtered.length} productos`;
+    }
 
+    // Sin resultados
     if (filtered.length === 0) {
-        productsGrid.innerHTML = `
+        DOM.productsGrid.innerHTML = `
             <div style="grid-column: 1/-1; text-align: center; padding: 40px; color: #64748b;">
                 <i class="fa-solid fa-magnifying-glass" style="font-size: 2rem; margin-bottom: 10px;"></i>
                 <p>No se encontraron productos.</p>
@@ -117,25 +144,28 @@ function renderProducts() {
         return;
     }
 
-    productsGrid.innerHTML = filtered.map(p => {
-        // Buscar si el producto ya está en el carrito
+    // Tarjetas de productos
+    const defaultImage = "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=600&q=80";
+
+    DOM.productsGrid.innerHTML = filtered.map(p => {
         const cartItem = cart.find(item => item.id === p.id);
         const qtyInCart = cartItem ? cartItem.qty : 0;
+        const categoryBadgeClass = p.category === 'audio' ? 'badge-beat' : 'badge-home';
+        const categoryLabel = p.category === 'audio' ? 'BEAT • AUDIO' : 'HOME • BAZAR';
 
         return `
             <div class="product-card">
-                ${p.badge ? `<span class="card-badge ${p.category === 'audio' ? 'badge-beat' : 'badge-home'}">${p.badge}</span>` : ''}
+                ${p.badge ? `<span class="card-badge ${categoryBadgeClass}">${escapeHTML(p.badge)}</span>` : ''}
                 <div class="product-img-wrapper">
-                    <img src="${p.image}" alt="${p.title}" onerror="this.src='https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=600&q=80'">
+                    <img src="${escapeHTML(p.image)}" alt="${escapeHTML(p.title)}" onerror="this.src='${defaultImage}'">
                 </div>
                 <div class="product-info">
-                    <span class="product-category-tag">${p.category === 'audio' ? 'BEAT • AUDIO' : 'HOME • BAZAR'}</span>
-                    <h3 class="product-title">${p.title}</h3>
-                    <p class="product-desc">${p.desc}</p>
+                    <span class="product-category-tag">${categoryLabel}</span>
+                    <h3 class="product-title">${escapeHTML(p.title)}</h3>
+                    <p class="product-desc">${escapeHTML(p.desc || '')}</p>
                     <div class="product-bottom">
                         <span class="product-price">$${p.price.toLocaleString()}</span>
                         
-                        <!-- Si no está en el carrito: Botón Naranja. Si está: Selector de Cantidad + / - -->
                         ${qtyInCart === 0 ? `
                             <button class="add-cart-btn" onclick="addToCart(${p.id})" title="Agregar al Carrito">
                                 <i class="fa-solid fa-cart-plus"></i>
@@ -162,73 +192,12 @@ function filterCategory(cat) {
     renderProducts();
 }
 
-function setupEventListeners() {
-    document.getElementById('search-input').addEventListener('input', (e) => {
-        searchQuery = e.target.value;
-        renderProducts();
-    });
-
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.addEventListener('click', () => filterCategory(btn.dataset.category));
-    });
-
-    document.getElementById('sort-select').addEventListener('change', (e) => {
-        currentSort = e.target.value;
-        renderProducts();
-    });
-
-    document.getElementById('cart-toggle-btn').addEventListener('click', toggleCart);
-    document.getElementById('close-cart-btn').addEventListener('click', toggleCart);
-    cartOverlay.addEventListener('click', toggleCart);
-
-    // ACCESO OCULTO ADMIN (Atajo + Triple Click Logo)
-    document.addEventListener('keydown', (e) => {
-        if (e.ctrlKey && e.shiftKey && e.key === 'A') {
-            e.preventDefault();
-            openAdminLogin();
-        }
-    });
-
-    let logoClickCount = 0;
-    let logoClickTimer;
-    const mainLogo = document.getElementById('main-logo');
-    if (mainLogo) {
-        mainLogo.addEventListener('click', (e) => {
-            e.preventDefault();
-            logoClickCount++;
-            clearTimeout(logoClickTimer);
-
-            if (logoClickCount === 3) {
-                openAdminLogin();
-                logoClickCount = 0;
-            } else {
-                logoClickTimer = setTimeout(() => {
-                    logoClickCount = 0;
-                }, 1000);
-            }
-        });
-    }
-
-    // Proceso de Login Admin
-    document.getElementById('admin-login-form').addEventListener('submit', (e) => {
-        e.preventDefault();
-        const pass = document.getElementById('admin-pass-input').value;
-        if (pass === '1234' || pass === 'admin') {
-            closeAdminLogin();
-            openAdminPanel();
-        } else {
-            alert('Contraseña incorrecta. Probá con "1234".');
-        }
-    });
-
-    document.getElementById('product-form').addEventListener('submit', handleProductFormSubmit);
-    document.getElementById('whatsapp-checkout-btn').addEventListener('click', sendWhatsAppOrder);
-}
-
-// Carrito
+// --- 4. GESTIÓN DEL CARRITO ---
 function toggleCart() {
-    cartDrawer.classList.toggle('active');
-    cartOverlay.classList.toggle('active');
+    if (DOM.cartDrawer && DOM.cartOverlay) {
+        DOM.cartDrawer.classList.toggle('active');
+        DOM.cartOverlay.classList.toggle('active');
+    }
 }
 
 function addToCart(productId) {
@@ -244,7 +213,7 @@ function addToCart(productId) {
 
     saveCartToStorage();
     updateCartUI();
-    renderProducts(); // Re-renderiza para mostrar los botones (+ / -) en la tarjeta
+    renderProducts();
 }
 
 function updateCartQty(productId, change) {
@@ -258,18 +227,20 @@ function updateCartQty(productId, change) {
 
     saveCartToStorage();
     updateCartUI();
-    renderProducts(); // Actualiza tanto la tarjeta de producto como la vista general
+    renderProducts();
 }
 
 function updateCartUI() {
     const totalQty = cart.reduce((sum, i) => sum + i.qty, 0);
     const totalPrice = cart.reduce((sum, i) => sum + (i.price * i.qty), 0);
 
-    cartCountEl.innerText = totalQty;
-    cartTotalPriceEl.innerText = `$${totalPrice.toLocaleString()}`;
+    if (DOM.cartCountEl) DOM.cartCountEl.innerText = totalQty;
+    if (DOM.cartTotalPriceEl) DOM.cartTotalPriceEl.innerText = `$${totalPrice.toLocaleString()}`;
+
+    if (!DOM.cartItemsContainer) return;
 
     if (cart.length === 0) {
-        cartItemsContainer.innerHTML = `
+        DOM.cartItemsContainer.innerHTML = `
             <div style="text-align: center; padding: 40px 0; color: #64748b;">
                 <i class="fa-solid fa-basket-shopping" style="font-size: 2.5rem; margin-bottom: 10px;"></i>
                 <p>Tu carrito está vacío.</p>
@@ -278,11 +249,11 @@ function updateCartUI() {
         return;
     }
 
-    cartItemsContainer.innerHTML = cart.map(item => `
+    DOM.cartItemsContainer.innerHTML = cart.map(item => `
         <div class="cart-item">
-            <img src="${item.image}" alt="${item.title}">
+            <img src="${escapeHTML(item.image)}" alt="${escapeHTML(item.title)}">
             <div class="cart-item-info">
-                <div class="cart-item-title">${item.title}</div>
+                <div class="cart-item-title">${escapeHTML(item.title)}</div>
                 <div class="cart-item-price">$${item.price.toLocaleString()} c/u</div>
                 <div class="cart-qty-controls">
                     <button class="qty-btn" onclick="updateCartQty(${item.id}, -1)">-</button>
@@ -295,7 +266,6 @@ function updateCartUI() {
     `).join('');
 }
 
-// Envío a WhatsApp
 function sendWhatsAppOrder() {
     if (cart.length === 0) {
         alert('Tu carrito está vacío.');
@@ -315,24 +285,35 @@ function sendWhatsAppOrder() {
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
 }
 
-// Funciones Administrador
+// --- 5. PANEL ADMINISTRADOR ---
 function openAdminLogin() { 
-    document.getElementById('admin-pass-input').value = '';
-    document.getElementById('admin-login-modal').classList.add('active'); 
+    if (DOM.adminPassInput) DOM.adminPassInput.value = '';
+    if (DOM.adminLoginModal) DOM.adminLoginModal.classList.add('active'); 
 }
-function closeAdminLogin() { document.getElementById('admin-login-modal').classList.remove('active'); }
+
+function closeAdminLogin() { 
+    if (DOM.adminLoginModal) DOM.adminLoginModal.classList.remove('active'); 
+}
+
 function openAdminPanel() {
-    document.getElementById('admin-panel-modal').classList.add('active');
-    renderAdminTable();
+    if (DOM.adminPanelModal) {
+        DOM.adminPanelModal.classList.add('active');
+        renderAdminTable();
+    }
 }
-function closeAdminPanel() { document.getElementById('admin-panel-modal').classList.remove('active'); }
+
+function closeAdminPanel() { 
+    if (DOM.adminPanelModal) DOM.adminPanelModal.classList.remove('active'); 
+}
 
 function renderAdminTable() {
     const tbody = document.getElementById('admin-products-table');
+    if (!tbody) return;
+
     tbody.innerHTML = products.map(p => `
         <tr>
-            <td><img src="${p.image}" alt=""></td>
-            <td><strong>${p.title}</strong></td>
+            <td><img src="${escapeHTML(p.image)}" alt=""></td>
+            <td><strong>${escapeHTML(p.title)}</strong></td>
             <td><span class="card-badge ${p.category === 'audio' ? 'badge-beat' : 'badge-home'}">${p.category.toUpperCase()}</span></td>
             <td>$${p.price.toLocaleString()}</td>
             <td>
@@ -354,7 +335,7 @@ function handleProductFormSubmit(e) {
     const desc = document.getElementById('prod-desc').value;
 
     if (id) {
-        const index = products.findIndex(p => p.id === parseInt(id));
+        const index = products.findIndex(p => p.id === parseInt(id, 10));
         if (index !== -1) {
             products[index] = { ...products[index], title, price, category, image, badge, desc };
         }
@@ -381,23 +362,33 @@ function editProduct(id) {
     document.getElementById('prod-badge').value = p.badge || '';
     document.getElementById('prod-desc').value = p.desc || '';
 
-    document.getElementById('form-title').innerText = 'Editar Producto';
-    document.getElementById('save-prod-btn').innerHTML = '<i class="fa-solid fa-rotate"></i> Actualizar Producto';
-    document.getElementById('cancel-edit-btn').style.display = 'inline-block';
+    const formTitle = document.getElementById('form-title');
+    const saveBtn = document.getElementById('save-prod-btn');
+    const cancelBtn = document.getElementById('cancel-edit-btn');
+
+    if (formTitle) formTitle.innerText = 'Editar Producto';
+    if (saveBtn) saveBtn.innerHTML = '<i class="fa-solid fa-rotate"></i> Actualizar Producto';
+    if (cancelBtn) cancelBtn.style.display = 'inline-block';
 }
 
 function resetProductForm() {
-    document.getElementById('product-form').reset();
-    document.getElementById('prod-id').value = '';
-    document.getElementById('form-title').innerText = 'Agregar Nuevo Producto';
-    document.getElementById('save-prod-btn').innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Guardar Producto';
-    document.getElementById('cancel-edit-btn').style.display = 'none';
+    const form = document.getElementById('product-form');
+    if (form) form.reset();
+
+    const prodId = document.getElementById('prod-id');
+    const formTitle = document.getElementById('form-title');
+    const saveBtn = document.getElementById('save-prod-btn');
+    const cancelBtn = document.getElementById('cancel-edit-btn');
+
+    if (prodId) prodId.value = '';
+    if (formTitle) formTitle.innerText = 'Agregar Nuevo Producto';
+    if (saveBtn) saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Guardar Producto';
+    if (cancelBtn) cancelBtn.style.display = 'none';
 }
 
 function deleteProduct(id) {
     if (confirm('¿Eliminar este producto del catálogo?')) {
         products = products.filter(p => p.id !== id);
-        // Si estaba en el carrito, también lo borramos
         cart = cart.filter(p => p.id !== id);
         saveCartToStorage();
         saveProductsToStorage();
@@ -420,7 +411,9 @@ function deleteAllProducts() {
 }
 
 function applyMassPriceChange(multiplier) {
-    const percentage = parseFloat(document.getElementById('mass-percentage').value);
+    const percentageEl = document.getElementById('mass-percentage');
+    const percentage = parseFloat(percentageEl ? percentageEl.value : 0);
+
     if (isNaN(percentage) || percentage <= 0) {
         alert('Ingresá un porcentaje válido.');
         return;
@@ -438,10 +431,10 @@ function applyMassPriceChange(multiplier) {
     alert(`Precios actualizados un ${percentage}% correctamente.`);
 }
 
-// Carga Masiva CSV
+// --- 6. IMPORTACIÓN Y EXPORTACIÓN CSV ---
 function processCSVImport() {
     const fileInput = document.getElementById('csv-file-input');
-    const file = fileInput.files[0];
+    const file = fileInput ? fileInput.files[0] : null;
 
     if (!file) {
         alert('Por favor seleccioná un archivo .csv primero.');
@@ -458,8 +451,10 @@ function processCSVImport() {
             return;
         }
 
-        const mode = document.querySelector('input[name="csv-mode"]:checked').value;
+        const modeEl = document.querySelector('input[name="csv-mode"]:checked');
+        const mode = modeEl ? modeEl.value : 'append';
         const newProducts = [];
+        const defaultImg = 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=600&q=80';
 
         for (let i = 1; i < rows.length; i++) {
             const columns = rows[i].split(/,|;/).map(col => col.replace(/^"(.*)"$/, '$1').trim());
@@ -468,7 +463,7 @@ function processCSVImport() {
                 const title = columns[0];
                 const category = (columns[1] || 'bazar').toLowerCase();
                 const price = parseFloat(columns[2]) || 0;
-                const image = columns[3] || 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=600&q=80';
+                const image = columns[3] || defaultImg;
                 const badge = columns[4] || '';
                 const desc = columns[5] || '';
 
@@ -524,4 +519,90 @@ function downloadCSVTemplate() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+}
+
+// Helper para sanear HTML y evitar inyecciones de código
+function escapeHTML(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+// --- 7. CONFIGURACIÓN DE LISTENERS ---
+function setupEventListeners() {
+    if (DOM.searchInput) {
+        DOM.searchInput.addEventListener('input', (e) => {
+            searchQuery = e.target.value;
+            renderProducts();
+        });
+    }
+
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => filterCategory(btn.dataset.category));
+    });
+
+    if (DOM.sortSelect) {
+        DOM.sortSelect.addEventListener('change', (e) => {
+            currentSort = e.target.value;
+            renderProducts();
+        });
+    }
+
+    if (DOM.cartToggleBtn) DOM.cartToggleBtn.addEventListener('click', toggleCart);
+    if (DOM.closeCartBtn) DOM.closeCartBtn.addEventListener('click', toggleCart);
+    if (DOM.cartOverlay) DOM.cartOverlay.addEventListener('click', toggleCart);
+
+    // Acceso Oculto Admin (Atajo Ctrl+Shift+A)
+    document.addEventListener('keydown', (e) => {
+        if (e.ctrlKey && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
+            e.preventDefault();
+            openAdminLogin();
+        }
+    });
+
+    // Acceso Oculto Admin (Triple Click Logo)
+    let logoClickCount = 0;
+    let logoClickTimer;
+    if (DOM.mainLogo) {
+        DOM.mainLogo.addEventListener('click', (e) => {
+            e.preventDefault();
+            logoClickCount++;
+            clearTimeout(logoClickTimer);
+
+            if (logoClickCount === 3) {
+                openAdminLogin();
+                logoClickCount = 0;
+            } else {
+                logoClickTimer = setTimeout(() => {
+                    logoClickCount = 0;
+                }, 1000);
+            }
+        });
+    }
+
+    // Proceso de Login Admin
+    if (DOM.adminLoginForm) {
+        DOM.adminLoginForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const pass = DOM.adminPassInput ? DOM.adminPassInput.value : '';
+            if (pass === '1234' || pass === 'admin') {
+                closeAdminLogin();
+                openAdminPanel();
+            } else {
+                alert('Contraseña incorrecta. Probá con "1234".');
+            }
+        });
+    }
+
+    if (DOM.productForm) {
+        DOM.productForm.addEventListener('submit', handleProductFormSubmit);
+    }
+
+    if (DOM.whatsappCheckoutBtn) {
+        DOM.whatsappCheckoutBtn.addEventListener('click', sendWhatsAppOrder);
+    }
 }
